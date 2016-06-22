@@ -1,0 +1,183 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Full apache web stack reference architecture.",
+    "Parameters": {
+        "AMI": {
+            "Description": "AMI Id to use for web layer.",
+            "Type": "AWS::EC2::Image::Id",
+            "Default": " ami-a4827dc9"
+        },
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access",
+            "Type": "String",
+            "Default": "training"
+        },
+        "InstanceType": {
+            "Type": "String",
+            "Default": "t2.micro",
+            "AllowedValues": [
+                "t2.micro",
+                "t2.small",
+                "t2.medium",
+                "t2.large"
+            ],
+            "Description": "EC2 instance type (e.g. t2.micro, t2.small, t2.medium, t2.large)",
+            "ConstraintDescription": "must be a valid EC2 instance type."
+        },
+        "InstanceSecurityGroup": {
+            "Description": "security group for web layer",
+            "Type": "List<AWS::EC2::SecurityGroup::Id>"
+        },
+        "PublicSubnets": {
+            "Description": "List of public subnets for ELB and web servers",
+            "Type": "List<AWS::EC2::Subnet::Id>",
+            "Default": "subnet-7dacfa57,subnet-8a9492fc"
+        },
+        "VPC": {
+            "Description": "The VPC in which this stack is being deployed",
+            "Type": "AWS::EC2::VPC::Id",
+            "Default": "training"
+        },
+        "TagName": {
+            "Description": "name to associate in tag",
+            "Type": "String"
+        },
+        "TagBudgetCode": {
+            "Description": "BudgetCode to associate in tag",
+            "Type": "String"
+        },
+        "TagEnv": {
+            "Description": "environment code (dev, test, qa, prod) to associate in tag",
+            "Type": "String",
+            "AllowedValues": [
+                "dev",
+                "test",
+                "qa",
+                "prod"
+            ]
+        }
+    },
+    "Resources": {
+        "WebScaleGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "Cooldown": "600",
+                "DesiredCapacity": "4",
+                "HealthCheckGracePeriod": "180",
+                "HealthCheckType": "ELB",
+                "LaunchConfigurationName": {
+                    "Ref": "LaunchConfiguration"
+                },
+                "LoadBalancerNames" : [
+                    {
+                        "Ref": "MyLoadBalancer"
+                    }
+                ],
+                "MaxSize": "6",
+                "MinSize": "4",
+                "VPCZoneIdentifier": {
+                        "Ref": "PublicSubnets"
+                    },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Ref": "TagName" },
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "Env",
+                        "Value": { "Ref": "TagEnv" },
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "BudgetCode",
+                        "Value": { "Ref": "TagBudgetCode" },
+                        "PropagateAtLaunch": true
+                    }
+                ]
+            }
+        },
+        "LaunchConfiguration": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "AssociatePublicIpAddress" : true,
+                "IamInstanceProfile" : "training_instance_role",
+                "ImageId": {
+                    "Ref": "AMI"
+                },
+                "InstanceType": {
+                    "Ref": "InstanceType"
+                },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "SecurityGroups": 
+                    {
+                        "Ref": "InstanceSecurityGroup"
+                    },
+                "InstanceMonitoring": false,
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash\n",
+                                "yum update -y\n",
+                                "yum install -y httpd\n",
+                                "service httpd start\n",
+                                "chkconfig httpd on\n",
+                                "aws s3 cp s3://igaydos-training/health-check.html /var/www/html/health-check.html\n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "MyLoadBalancer": {
+                "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+                "Properties": {
+                    "CrossZone": true,
+                    "Listeners": [
+                        {
+                            "LoadBalancerPort": "80",
+                            "InstancePort": "80",
+                            "Protocol": "HTTP"
+                        }
+                    ],
+                    "HealthCheck": {
+                        "Target": "HTTP:80/health-check.html",
+                        "HealthyThreshold": "5",
+                        "UnhealthyThreshold": "3",
+                        "Interval": "30",
+                        "Timeout": "15"
+                    },
+                    "SecurityGroups":
+                        {
+                            "Ref": "InstanceSecurityGroup"
+                        },
+                    "Subnets": {
+                            "Ref": "PublicSubnets"
+                        }
+                }
+        }
+    },
+    "Outputs": {
+            "loadbalancerDNS": {
+                "Value": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "http://",
+                            {
+                                "Fn::GetAtt": [
+                                    "MyLoadBalancer",
+                                    "DNSName"
+                                ]
+                            }
+                        ]
+                    ]
+                }
+            }
+        }
+
+}
