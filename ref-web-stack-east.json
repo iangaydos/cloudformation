@@ -38,6 +38,11 @@
             "Type": "AWS::EC2::VPC::Id",
             "Default": "training"
         },
+        "DeploymentDNS": {
+            "Description": "DNS entry for ELB",
+            "Type": "String",
+            "Default": "training.iangaydos.com."
+        },
         "TagName": {
             "Description": "name to associate in tag",
             "Type": "String"
@@ -159,6 +164,18 @@
                             "Ref": "PublicSubnets"
                         }
                 }
+        },
+        "myDNS" : {
+        "Type" : "AWS::Route53::RecordSet",
+        "Properties" : {
+              "HostedZoneId" : "Z15YTF78XUD657",
+              "AliasTarget" : {
+                  "HostedZoneId" : { "Fn::GetAtt" : ["MyLoadBalancer", "CanonicalHostedZoneNameID"] },
+                  "DNSName" : { "Fn::GetAtt" : ["MyLoadBalancer","DNSName"] }
+               },
+               "Name" : {"Ref" : "DeploymentDNS"},
+               "Type" : "A"
+            }
         }
     },
     "Outputs": {
