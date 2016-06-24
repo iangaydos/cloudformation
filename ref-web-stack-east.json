@@ -70,19 +70,13 @@
                 "DesiredCapacity": "4",
                 "HealthCheckGracePeriod": "180",
                 "HealthCheckType": "ELB",
-                "LaunchConfigurationName": {
-                    "Ref": "LaunchConfiguration"
-                },
+                "LaunchConfigurationName": {"Ref": "LaunchConfiguration"},
                 "LoadBalancerNames" : [
-                    {
-                        "Ref": "MyLoadBalancer"
-                    }
+                    {"Ref": "MyLoadBalancer"}
                 ],
                 "MaxSize": "6",
                 "MinSize": "4",
-                "VPCZoneIdentifier": {
-                        "Ref": "PublicSubnets"
-                    },
+                "VPCZoneIdentifier": {"Ref": "PublicSubnets"},
                 "Tags": [
                     {
                         "Key": "Name",
@@ -107,19 +101,10 @@
             "Properties": {
                 "AssociatePublicIpAddress" : true,
                 "IamInstanceProfile" : "training_instance_role",
-                "ImageId": {
-                    "Ref": "AMI"
-                },
-                "InstanceType": {
-                    "Ref": "InstanceType"
-                },
-                "KeyName": {
-                    "Ref": "KeyName"
-                },
-                "SecurityGroups": 
-                    {
-                        "Ref": "InstanceSecurityGroup"
-                    },
+                "ImageId": {"Ref": "AMI"},
+                "InstanceType": {"Ref": "InstanceType"},
+                "KeyName": {"Ref": "KeyName"},
+                "SecurityGroups": {"Ref": "InstanceSecurityGroup"},
                 "InstanceMonitoring": false,
                 "UserData": {
                     "Fn::Base64": {
@@ -136,6 +121,24 @@
                         ]
                     }
                 }
+            }
+        },
+        "ScaleUpPolicy" : {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties" : {
+                "AdjustmentType" : "ChangeInCapacity",
+                "AutoScalingGroupName" : {"Ref" : "WebScaleGroup"},
+                "Cooldown" : "600",
+                "ScalingAdjustment" : "1" 
+            }
+        },
+        "ScaleDownPolicy" : {
+            "Type" : "AWS::AutoScaling::ScalingPolicy",
+            "Properties" : {
+                "AdjustmentType" : "ChangeInCapacity",
+                "AutoScalingGroupName" : {"Ref" : "WebScaleGroup"},
+                "Cooldown" : "600",
+                "ScalingAdjustment" : "-1" 
             }
         },
         "MyLoadBalancer": {
@@ -164,6 +167,42 @@
                             "Ref": "PublicSubnets"
                         }
                 }
+        },
+        "AlarmCpuHigh" : {
+            "Type" : "AWS::CloudWatch::Alarm",
+            "Properties" : {
+                "AlarmActions" : [{"Ref" : "ScaleUpPolicy"}],
+                "AlarmDescription" : "Scale up if CPU > 70% for threshold duration.",
+                "MetricName" : "CPUUtilization",
+                "Namespace" : "AWS/EC2",
+                "Statistic" : "Average",
+                "ComparisonOperator" : "GreaterThanThreshold",
+                "Period" : "300",
+                "EvaluationPeriods" : "3",
+                "Threshold" : "70",
+                "Dimensions" : [{
+                    "Name" : "WebScaleGroup",
+                    "Value" : {"Ref" : "WebScaleGroup"}
+                }]
+            }
+        },
+        "AlarmCpuLow" : {
+            "Type" : "AWS::CloudWatch::Alarm",
+            "Properties" : {
+                "AlarmActions" : [{"Ref" : "ScaleDownPolicy"}],
+                "AlarmDescription" : "Scale up if CPU < 40% for threshold duration.",
+                "MetricName" : "CPUUtilization",
+                "Namespace" : "AWS/EC2",
+                "Statistic" : "Average",
+                "ComparisonOperator" : "LessThanThreshold",
+                "Period" : "300",
+                "EvaluationPeriods" : "3",
+                "Threshold" : "40",
+                "Dimensions" : [{
+                    "Name" : "WebScaleGroup",
+                    "Value" : {"Ref" : "WebScaleGroup"}
+                }]
+            }
         },
         "myDNS" : {
         "Type" : "AWS::Route53::RecordSet",
