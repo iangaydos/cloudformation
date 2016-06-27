@@ -1,0 +1,40 @@
+{
+ "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Single web server with UserData for demo.",
+  "Resources" : {
+	"WebServer" : {
+	   "Type" : "AWS::EC2::Instance",
+	   "Properties" : {
+	     "InstanceType" : "t2.micro",
+	     "ImageId" : "ami-a4827dc9",
+	     "AvailabilityZone" : "us-east-1a",
+	     "SubnetId" : "subnet-7dacfa57",
+	     "KeyName" : "training",
+	     "SecurityGroupIds" : ["sg-0cc6b077"],
+	     "Tags" : [{"Key" : "Name",
+		       "Value" : "webserver1"}],
+	     "UserData" : {
+	        "Fn::Base64" : {
+		"Fn::Join" : [
+		"",
+		[
+		"#!/bin/bash \n",
+		"yum update -y \n",
+		"yum install -y httpd \n",
+		"service httpd start \n",
+		"chkconfig httpd on \n"
+		]] 
+	    } }
+	   }
+	}
+  },
+  "Outputs" : {
+  	"webserverDNS" : {
+	   "Value" : {
+	     "Fn::Join" : [
+	       "",
+	       ["http://", {"Fn::GetAtt" : ["WebServer","PublicDnsName"]}]
+	      ] }
+  	 }
+  } 
+}
